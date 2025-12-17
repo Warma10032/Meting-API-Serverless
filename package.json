@@ -1,5 +1,5 @@
 {
-  "name": "@meting/serverlessless",
+  "name": "@meting/serverless",
   "version": "1.10.0",
   "main": "src/index.js",
   "type": "module",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@meting/core": "^1.6.0",
+    "aes-js": "^3.1.2",
     "hash.js": "^1.1.7",
     "hono": "^4.10.3",
     "lru-cache": "^11.2.2"

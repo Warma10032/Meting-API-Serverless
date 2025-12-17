@@ -4,20 +4,17 @@ compatibility_date = "2025-11-21"
 workers_dev = true
 compatibility_flags = ["nodejs_compat"]
 
-[vars]
-# Optional route prefix, empty string serves from root
-HTTP_PREFIX = ""
-# Public base URL of this Worker, used to build callback links
-METING_URL = ""
-# HMAC secret for auth (set with `wrangler secret put METING_TOKEN` in real env)
-METING_TOKEN = "token"
-# Comma separated referrer host allowlist for sending platform cookies
-METING_COOKIE_ALLOW_HOSTS = ""
-# Platform cookies (prefer secrets or dashboard env)
-METING_COOKIE_NETEASE = ""
-METING_COOKIE_TENCENT = ""
-METING_COOKIE_KUGOU = ""
-METING_COOKIE_BAIDU = ""
-METING_COOKIE_KUWO = ""
-# Fallback cookie used when the platform-specific one is empty
-METING_COOKIE = ""
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
