@@ -19,7 +19,14 @@ export function isAllowedHost (referrer, allowHosts = []) {
   try {
     const url = new URL(referrer)
     const hostname = url.hostname.toLowerCase()
-    return allowHosts.includes(hostname)
+    return allowHosts.some(rule => {
+      if (rule === hostname) return true
+      if (rule.includes('*')) {
+        const pattern = rule.split('*').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')
+        return new RegExp(`^${pattern}$`).test(hostname)
+      }
+      return false
+    })
   } catch (error) {
     return false
   }

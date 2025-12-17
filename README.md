@@ -45,18 +45,18 @@
 
 在 `wrangler.toml` 中留占位，正式值请用 `wrangler secret put <NAME>` 或 Cloudflare Dashboard 的环境变量/Secret 管理。
 
-| 变量名                        | 默认值    | 说明                                                                    |
-| ----------------------------- | --------- | ----------------------------------------------------------------------- |
-| `HTTP_PREFIX`               | ``        | 可选路由前缀，留空表示根路径                                            |
-| `METING_URL`                | -         | 对外可访问的基地址，用于生成回调链接；缺省时使用请求的 origin+前缀      |
-| `METING_TOKEN`              | `token` | HMAC 鉴权密钥，需要修改！建议设置为 Secret                              |
-| `METING_COOKIE_ALLOW_HOSTS` | ``        | 允许携带平台 Cookie 的 referrer host 白名单（逗号分隔，留空表示不限制） |
-| `METING_COOKIE_NETEASE`     | ``        | 网易云 Cookie（可选，带登录态的数据）                                   |
-| `METING_COOKIE_TENCENT`     | ``        | QQ 音乐 Cookie（可选）                                                  |
-| `METING_COOKIE_KUGOU`       | ``        | 酷狗 Cookie（可选）                                                     |
-| `METING_COOKIE_BAIDU`       | ``        | 百度 Cookie（可选）                                                     |
-| `METING_COOKIE_KUWO`        | ``        | 酷我 Cookie（可选）                                                     |
-| `METING_COOKIE`             | ``        | 通用 Cookie 兜底，平台专用值为空时使用                                  |
+| 变量名                        | 默认值    | 说明                                                                                               |
+| ----------------------------- | --------- | -------------------------------------------------------------------------------------------------- |
+| `HTTP_PREFIX`               | ``        | 可选路由前缀，留空表示根路径                                                                       |
+| `METING_URL`                | -         | 对外可访问的基地址，用于生成回调链接；缺省时使用请求的 origin+前缀                                 |
+| `METING_TOKEN`              | `token` | HMAC 鉴权密钥，建议修改，建议设置为 Secret 变量                                                    |
+| `METING_COOKIE_ALLOW_HOSTS` | ``        | 允许使用携带平台 Cookie 后端的 referrer host 白名单（英文逗号分隔，留空表示不限制，支持 * 通配符） |
+| `METING_COOKIE_NETEASE`     | ``        | 网易云 Cookie（可选，带登录态的数据）                                                              |
+| `METING_COOKIE_TENCENT`     | ``        | QQ 音乐 Cookie（可选）                                                                             |
+| `METING_COOKIE_KUGOU`       | ``        | 酷狗 Cookie（可选）                                                                                |
+| `METING_COOKIE_BAIDU`       | ``        | 百度 Cookie（可选）                                                                                |
+| `METING_COOKIE_KUWO`        | ``        | 酷我 Cookie（可选）                                                                                |
+| `METING_COOKIE`             | ``        | 通用 Cookie 兜底，平台专用值为空时使用                                                             |
 
 ## API
 
