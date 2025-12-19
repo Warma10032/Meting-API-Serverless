@@ -10,6 +10,17 @@ export function readCookie (server, env) {
 }
 
 /**
+ * 异步读取 Cookie，优先从 KV 读取 (仅限腾讯)，其次环境变量
+ */
+export async function readCookieAsync (server, env) {
+  if (server === 'tencent' && env.METING_KV) {
+    const kvCookie = await env.METING_KV.get('cookie_tencent')
+    if (kvCookie) return kvCookie.trim()
+  }
+  return readCookie(server, env)
+}
+
+/**
  * 验证 referrer 是否在允许的主机列表。
  */
 export function isAllowedHost (referrer, allowHosts = []) {

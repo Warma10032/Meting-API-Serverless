@@ -5,7 +5,7 @@ import hashjs from 'hash.js'
 import { HTTPException } from 'hono/http-exception'
 import { loadConfig } from '../config.js'
 import { format as lyricFormat } from '../utils/lyric.js'
-import { readCookie, isAllowedHost } from '../utils/cookie.js'
+import { readCookieAsync, isAllowedHost } from '../utils/cookie.js'
 import { LRUCache } from 'lru-cache'
 
 const cache = new LRUCache({
@@ -93,7 +93,7 @@ export default async (c) => {
     // 检查 referrer 并配置 cookie
     const referrer = c.req.header('referer')
     if (isAllowedHost(referrer, config.meting.cookie.allowHosts)) {
-      const cookie = readCookie(server, c.env)
+      const cookie = await readCookieAsync(server, c.env)
       if (cookie) {
         meting.cookie(cookie)
       }
