@@ -4,11 +4,10 @@ compatibility_date = "2025-11-21"
 workers_dev = true
 compatibility_flags = ["nodejs_compat"]
 
-# KV 存储绑定
-# 请替换 id 为你在 Cloudflare Dashboard 创建的 KV Namespace ID
-[[kv_namespaces]]
-binding = "METING_KV"
-id = "YOUR_KV_NAMESPACE_ID_HERE"
+# KV 存储绑定 (部署后在 Dashboard 绑定，或取消注释并填入 ID)
+# [[kv_namespaces]]
+# binding = "METING_KV"
+# id = "YOUR_KV_NAMESPACE_ID_HERE"
 
 # QQ音乐定时cookie刷新
 [triggers]
