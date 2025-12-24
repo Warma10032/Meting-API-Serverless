@@ -1,102 +1,134 @@
-# meting-api-serverless (Cloudflare Worker)
+# meting-api-serverless
 
-基于 Hono 的多平台音乐 API 代理，运行在 Cloudflare Workers，封装 [@meting/core](https://www.npmjs.com/package/@meting/core) 对网易云 / QQ 音乐 / 酷狗 / 百度 / 酷我提供统一接口。
+基于 Hono 的多平台音乐 API 代理，封装 [@meting/core](https://www.npmjs.com/package/@meting/core) 对网易云 / QQ 音乐 / 酷狗 / 百度 / 酷我提供统一接口，支持运行在 Cloudflare Workers、Vercel。
 
-## 一键部署
+## 🚀 部署教程
+
+本项目支持 Cloudflare Workers 和 Vercel 两种部署方式，推荐使用 Cloudflare Workers 以获得最佳性能和功能支持（QQ音乐 Cookie 自动保活）。
+
+### 方式一：Cloudflare Workers (推荐)
+
+#### 1. 一键部署
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Warma10032/Meting-API-Serverless)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FWarma10032%2FMeting-API-Serverless&project-name=meting-api-serverless&repository-name=Meting-API-Serverless)
 
-> 变量默认留空/`token`，部署后再到 Vercel / Cloudflare Dashboard 修改即可（`METING_TOKEN` 建议改成你的密钥）。
+点击按钮，登录 Cloudflare 账号，选择账户并点击 "Deploy" 即可完成基础部署。
 
-### Cloudflare Workers 部署步骤
+#### 2. 配置环境变量
 
-1. 点击按钮，选择账户/数据中心，直接部署。  
-2. 部署后到 Dashboard → Workers & Pages → 你的服务 → Settings → Variables，添加 `METING_TOKEN`（建议改成你的值）及其他可选变量（如 `HTTP_PREFIX`、`METING_URL`、各平台 Cookie）。  
-3. 如需自定义域名/路径，到 Routes 绑定域名或路由。  
-4. 本地调试/手动部署：`npx wrangler dev` / `npx wrangler deploy`（未设置变量时会使用默认值）。
+为了安全和功能完整，请在 Cloudflare Dashboard 中配置环境变量：
 
-### Vercel Edge 部署步骤
+1. 进入 **Workers & Pages** -> 选择本项目 -> **Settings** -> **Variables**。
+2. 点击 **Add variable** 添加以下变量：
 
-1. 点击按钮，选择账号/Team，保持默认根目录。  
-2. Vercel 会自动把 `api/edge.js` 部署成 Edge Function，路由保持 `/api`、`/demo`。  
-3. 部署后在 Project Settings → Environment Variables 添加 `METING_TOKEN`（建议设为 Secret），其他变量按需添加。  
-4. 本地验证：`vercel dev`；生产环境按 `vercel.json` 重写到 Edge Function。
+| 变量名                        | 推荐值/说明                                                                         |
+| :---------------------------- | :---------------------------------------------------------------------------------- |
+| `METING_TOKEN`              | **强烈建议修改**。API 鉴权密钥，防止接口被滥用                                |
+| `METING_COOKIE_ALLOW_HOSTS` | **推荐设置**。允许访问 vip 资源的域名白名单（如 `example.com,*.test.com`） |
+| `METING_COOKIE_TENCENT`     | QQ 音乐 Cookie。用于获取 VIP资源，**支持自动保活**                            |
+| `METING_COOKIE_NETEASE`     | 网易云 Cookie。用于获取 VIP资源                                                     |
+| `METING_COOKIE_KUGOU`       | 酷狗 Cookie                                                                         |
+| `METING_COOKIE_KUWO`        | 酷我 Cookie                                                                         |
 
-## 功能特性
+#### 3. 配置 QQ 音乐 Cookie 保活 (可选)
 
-- 🎵 多平台音乐数据透传（搜索、歌曲、专辑、歌单、歌词、封面、播放链接）
-- 🔐 HMAC-SHA1 鉴权保护敏感接口（url/pic/lrc）
-- 💾 内置 LRU 缓存减少上游调用
-- 🍪 按 referrer 白名单决定是否挂载平台 Cookie
-- 🧪 内置 `/demo` 页面，直接用 Meting + APlayer 预览
+如果你配置了 `METING_COOKIE_TENCENT`，建议开启自动保活功能，否则 Cookie 过期后需要手动更新。
 
-## 快速开始
+**3.1 创建 KV 数据库**
 
-1. 安装依赖
-   ```bash
-   npm install
-   # 或 pnpm install / yarn install
-   ```
-2. 本地预览（默认监听 8787）：
-   ```bash
-   npx wrangler dev
-   ```
-3. 部署到 Cloudflare Workers：
-   ```bash
-   npx wrangler deploy
-   ```
-4. 访问示例
-   - API: `https://<your-worker>/api?server=netease&type=search&id=hello`
-   - Demo: `https://<your-worker>/demo?server=netease&type=search&id=hello`
+1. 在左侧菜单点击 **Storage & Databases** -> **KV Namespace**
+2. 点击 **Create**，命名随意（例如 `meting_kv`），点击 **Add**
 
-### Vercel Edge 补充说明
+**3.2 绑定 KV 数据库**
 
-- 已内置 `api/edge.js` 和 `vercel.json`，自动按 Edge Function 运行。
-- 路由 `/api`、`/demo` 会被 `vercel.json` 重写到 Edge Function。
-- 环境变量在 Vercel Dashboard 配置同名项即可（`METING_TOKEN` 建议放 Secrets）。
-- 本地验证：`npx vercel dev`。
+1. 回到 **Workers & Pages** -> 选择本项目  -> **Bindings**
+2. 点击 **Add** -> **KV Namespace**
+3. **Variable name** 必须填写：`METING_KV`
+4. **KV Namespace** 选择你刚才创建的数据库
+5. 点击 **Deploy** 保存
 
-### 前端接入 (MetingJS/APlayer)
+**3.3 添加定时任务**
 
-- 在客户端只需把 `meting_api` 指向本服务的 `/api`，无需修改 meting.js 源码。示例：`meting_api: http://127.0.0.1:8787/api?server=:server&type=:type&id=:id`
-- APlayer/Meting 会将占位符 `:server/:type/:id` 替换为组件传入的值，因此你的 Worker/Vercel 部署可以直接作为后端 API。
+1. 回到 **Workers & Pages** -> 选择本项目  -> **Settings**
+2. 点击 **Trigger Events** 的 **Add**
+3. 选择添加 Cron Triggers
+4. 设置频率为每 4 小时一次
 
-## 环境变量清单
+完成以上步骤后，Worker 会自动将 QQ 音乐 Cookie 存入 KV，并定期刷新，无需人工干预。
 
-在 `wrangler.toml` 中留占位，正式值请用 `wrangler secret put <NAME>` 或 Cloudflare Dashboard 的环境变量/Secret 管理。
+---
 
-| 变量名                        | 默认值    | 说明                                                                    |
-| ----------------------------- | --------- | ----------------------------------------------------------------------- |
-| `HTTP_PREFIX`               |           | 路由前缀（可选，留空表示根路径）                                        |
-| `METING_URL`                |           | 对外可访问的基地址，用于生成回调链接（默认使用请求的 origin+路由前缀）  |
-| `METING_TOKEN`              | `token`   | HMAC 鉴权密钥，默认 `token`，强烈建议更改并设置为 Secret              |
-| `METING_COOKIE_ALLOW_HOSTS` |           | 允许访问平台 Cookie 的 referrer host 白名单（逗号分隔，留空表示不限制，支持 * 通配符） |
-| `METING_COOKIE_NETEASE`     |           | 网易云 Cookie（可选）                                                   |
-| `METING_COOKIE_TENCENT`     |           | QQ 音乐 Cookie（可选）                                                  |
-| `METING_COOKIE_KUGOU`       |           | 酷狗 Cookie（可选）                                                     |
-| `METING_COOKIE_BAIDU`       |           | 百度 Cookie（可选）                                                     |
-| `METING_COOKIE_KUWO`        |           | 酷我 Cookie（可选）                                                     |
-| `METING_COOKIE`             |           | 通用 Cookie 兜底，平台专用值为空时使用（可选）                          |
+### 方式二：Vercel 部署
 
-## API
+1. 点击按钮一键部署：
 
-基础路径：`/api`
+   [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FWarma10032%2FMeting-API-Serverless&project-name=meting-api-serverless&repository-name=Meting-API-Serverless)
+2. 部署完成后，进入 Project Settings -> Environment Variables 添加环境变量。
+
+   | 变量名                        | 推荐值/说明                                                                         |
+   | :---------------------------- | :---------------------------------------------------------------------------------- |
+   | `METING_TOKEN`              | **强烈建议修改**。API 鉴权密钥，防止接口被滥用                                |
+   | `METING_COOKIE_ALLOW_HOSTS` | **推荐设置**。允许访问 vip 资源的域名白名单（如 `example.com,*.test.com`） |
+   | `METING_COOKIE_TENCENT`     | QQ 音乐 Cookie。用于获取 VIP资源                                                    |
+   | `METING_COOKIE_NETEASE`     | 网易云 Cookie。用于获取 VIP资源                                                     |
+   | `METING_COOKIE_KUGOU`       | 酷狗 Cookie                                                                         |
+   | `METING_COOKIE_KUWO`        | 酷我 Cookie                                                                         |
+
+> 注意：Vercel 部署不支持 QQ 音乐 Cookie 的自动保活功能。
+
+## 🛠️ 使用指南
+
+### API 接口
+
+基础路径：`https://你的域名/api`
 
 **请求参数**
 
-| 参数                 | 必填 | 说明                                                                                        |
-| -------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| `server`           | 是   | `netease` / `tencent` / `kugou` / `baidu` / `kuwo`                                |
-| `type`             | 是   | `search` / `song` / `album` / `artist` / `playlist` / `lrc` / `url` / `pic` |
-| `id`               | 是   | 资源 ID                                                                                     |
-| `token` / `auth` | 部分 | `lrc` / `url` / `pic` 需要鉴权                                                        |
+| 参数       | 必填 | 说明                                                                                                  |
+| ---------- | ---- | ----------------------------------------------------------------------------------------------------- |
+| `server` | 是   | 平台：`netease` (网易云) / `tencent` (QQ) / `kugou` (酷狗) / `baidu` (百度) / `kuwo` (酷我) |
+| `type`   | 是   | 类型：`search` / `song` / `album` / `artist` / `playlist` / `lrc` / `url` / `pic`     |
+| `id`     | 是   | 资源 ID (如歌曲 ID、歌单 ID)                                                                          |
 
-**返回**
+**示例**
 
-- `search`/`song`/`album`/`artist`/`playlist`: JSON 数组
-- `lrc`: LRC 文本
-- `url`/`pic`: 302 重定向到真实资源
+- 获取网易云歌曲详情：`https://你的域名/api?server=netease&type=song&id=186016`
+
+### 前端接入 (MetingJS)
+
+如果你使用 [MetingJS](https://github.com/metowolf/MetingJS)，只需设置 `meting_api` 即可：
+
+```html
+<meting-js
+    server="netease"
+    type="playlist"
+    id="60198"
+    meting_api="https://你的域名/api?server=:server&type=:type&id=:id">
+</meting-js>
+```
+
+## ⚙️ 环境变量清单
+
+在 `wrangler.toml` 中留占位，正式值请用 `wrangler secret put <NAME>` 或 Cloudflare Dashboard 的环境变量/Secret 管理。
+
+| 变量名                        | 默认值    | 说明                                                                                   |
+| ----------------------------- | --------- | -------------------------------------------------------------------------------------- |
+| `HTTP_PREFIX`               |           | 路由前缀（可选，留空表示根路径）                                                       |
+| `METING_URL`                |           | 对外可访问的基地址，用于生成回调链接（默认使用请求的 origin+路由前缀）                 |
+| `METING_TOKEN`              | `token` | HMAC 鉴权密钥，默认 `token`，强烈建议更改并设置为 Secret                             |
+| `METING_COOKIE_ALLOW_HOSTS` |           | 允许访问平台 Cookie 的 referrer host 白名单（逗号分隔，留空表示不限制，支持 * 通配符） |
+| `METING_COOKIE_NETEASE`     |           | 网易云 Cookie（可选）                                                                  |
+| `METING_COOKIE_TENCENT`     |           | QQ 音乐 Cookie（可选）                                                                 |
+| `METING_COOKIE_KUGOU`       |           | 酷狗 Cookie（可选）                                                                    |
+| `METING_COOKIE_BAIDU`       |           | 百度 Cookie（可选）                                                                    |
+| `METING_COOKIE_KUWO`        |           | 酷我 Cookie（可选）                                                                    |
+| `METING_COOKIE`             |           | 通用 Cookie 兜底，平台专用值为空时使用（可选）                                         |
+
+## 📝 开发与调试
+
+1. 安装依赖：`npm install`
+2. 本地启动：`npx wrangler dev`
+3. 访问测试：`http://localhost:8787/demo`
 
 ## 鉴权计算
 

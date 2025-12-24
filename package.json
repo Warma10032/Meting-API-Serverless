@@ -1,6 +1,6 @@
 {
   "name": "@meting/serverless",
-  "version": "1.10.0",
+  "version": "1.1.0",
   "main": "src/index.js",
   "type": "module",
   "author": "metowolf",
