@@ -1,0 +1,24 @@
+name = "meting-api-serverless"
+main = "src/index.js"
+compatibility_date = "2025-11-21"
+workers_dev = true
+compatibility_flags = ["nodejs_compat"]
+
+# QQ音乐定时cookie刷新
+[triggers]
+crons = ["0 */4 * * *"]
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
