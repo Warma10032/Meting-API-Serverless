@@ -1,4 +1,10 @@
 export async function refreshQQCookie (env) {
+  // 0. 检查 KV 是否绑定
+  if (!env.METING_KV) {
+    console.warn('未绑定 METING_KV，跳过 QQ 音乐 Cookie 刷新。请在 wrangler.toml 或 Dashboard 中重新绑定 KV Namespace。')
+    return
+  }
+
   // 1. 获取当前 Cookie (优先 KV，其次环境变量)
   let currentCookie = await env.METING_KV.get('cookie_tencent')
   if (!currentCookie) {
