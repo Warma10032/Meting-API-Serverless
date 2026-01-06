@@ -20,7 +20,6 @@ export async function refreshQQCookie (env) {
     currentCookie = env.METING_COOKIE_TENCENT || env.METING_COOKIE || ''
   }
   
-  console.log('当前 QQ 音乐 Cookie:', currentCookie)
 
   if (!currentCookie) {
     result.message = '错误: 未找到 QQ 音乐 Cookie'
