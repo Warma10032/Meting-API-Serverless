@@ -1,19 +1,31 @@
+import { createHash } from 'node:crypto'
+
 export async function refreshQQCookie (env) {
+  const result = { success: false, message: '未执行刷新', data: null }
+
+  let currentCookie = ''
   // 0. 检查 KV 是否绑定
   if (!env.METING_KV) {
-    console.warn('未绑定 METING_KV，跳过 QQ 音乐 Cookie 刷新。请在 wrangler.toml 或 Dashboard 中重新绑定 KV Namespace。')
-    return
+    result.message = '错误: 未绑定 METING_KV。请在 Dashboard 绑定 KV Namespace。'
+    console.warn(result.message)
+    return result
+  }
+  else {
+    currentCookie = await env.METING_KV.get('cookie_tencent')
   }
 
-  // 1. 获取当前 Cookie (优先 KV，其次环境变量)
-  let currentCookie = await env.METING_KV.get('cookie_tencent')
+  // 1. 获取当前 Cookie
+
   if (!currentCookie) {
     currentCookie = env.METING_COOKIE_TENCENT || env.METING_COOKIE || ''
   }
+  
+  console.log('当前 QQ 音乐 Cookie:', currentCookie)
 
   if (!currentCookie) {
-    console.log('未找到 QQ 音乐 Cookie，跳过刷新')
-    return
+    result.message = '错误: 未找到 QQ 音乐 Cookie'
+    console.log(result.message)
+    return result
   }
 
   // 2. 解析 Cookie
@@ -21,27 +33,38 @@ export async function refreshQQCookie (env) {
   const refreshToken = cookieDict.psrf_qqrefresh_token
   const openid = cookieDict.psrf_qqopenid
   const uin = cookieDict.uin || ''
-  const strMusicId = uin.replace(/\D/g, '') // 提取数字
-  const token = cookieDict.qqmusic_key || cookieDict.qm_keyst || ''
+  const strMusicId = uin.replace(/\D/g, '')
+  const musicKey = cookieDict.qqmusic_key || cookieDict.qm_keyst || ''
+  const accessToken = cookieDict.psrf_qqaccess_token || ''
+  const refreshKey = cookieDict.psrf_qqrefresh_key || ''
+  
+  // 尝试从 Cookie 中提取 QIMEI
+  const qimei36 = cookieDict._qimei_q36 || ''
+  const qimei16 = cookieDict._qimei_q16 || (qimei36 ? qimei36.substring(0, 16) : '')
 
   if (!refreshToken || !openid) {
-    console.log('Cookie 缺少关键字段 (psrf_qqrefresh_token/psrf_qqopenid)，无法刷新')
-    return
+    result.message = '错误: Cookie 缺少关键字段 (psrf_qqrefresh_token/psrf_qqopenid)'
+    console.log(result.message)
+    return result
   }
 
-  // 3. 构造请求参数 (完全复刻 lx-music-api-server 逻辑)
-  const comm = buildComm(strMusicId, token)
+  // 3. 构造请求参数
+  // 注意：如果 refreshKey 为空，仍需传递空字符串，否则可能导致签名校验失败或参数错误
+  const comm = buildComm(strMusicId, musicKey, qimei16, qimei36)
   const reqData = {
     comm,
     req: {
       module: 'music.login.LoginServer',
       method: 'Login',
       param: {
-        code: '',
         openid,
+        access_token: accessToken,
         refresh_token: refreshToken,
-        str_musicid: strMusicId,
-        type: 2
+        expired_in: 0,
+        musicid: parseInt(strMusicId || '0'),
+        musickey: musicKey,
+        refresh_key: refreshKey,
+        loginMode: 2
       }
     }
   }
@@ -54,18 +77,20 @@ export async function refreshQQCookie (env) {
     const response = await fetch(`https://u.y.qq.com/cgi-bin/musics.fcg?sign=${sign}`, {
       method: 'POST',
       headers: {
-        'User-Agent': 'Android12-AndroidPhone-20349-201-0-ting#958959317/661004247-LOGIN-wifi', // 模拟安卓 UA
+        'User-Agent': 'Android12-AndroidPhone-20349-201-0-ting#958959317/661004247-LOGIN-wifi',
         'Content-Type': 'application/json'
       },
       body: bodyStr
     })
 
     const data = await response.json()
+    result.data = data
 
     // 检查响应
     if (data.req?.code !== 0) {
-      console.error('刷新请求失败:', JSON.stringify(data))
-      return
+      result.message = `刷新失败 (Code: ${data.req?.code || 'Unknown'}): 这通常意味着 Cookie 已完全失效、签名错误或缺少 refresh_key。原始响应: ${JSON.stringify(data)}`
+      console.error(result.message)
+      return result
     }
 
     const loginData = data.req.data
@@ -91,13 +116,20 @@ export async function refreshQQCookie (env) {
     // 5. 保存到 KV
     if (updatedCookieStr !== currentCookie) {
       await env.METING_KV.put('cookie_tencent', updatedCookieStr)
-      console.log('QQ 音乐 Cookie 刷新成功并已保存到 KV')
+      result.success = true
+      result.message = 'QQ 音乐 Cookie 刷新成功并已保存到 KV'
+      console.log(result.message)
     } else {
-      console.log('Cookie 未发生变化')
+      result.success = true
+      result.message = 'Cookie 未发生变化'
+      console.log(result.message)
     }
   } catch (e) {
+    result.message = `系统错误: ${e.message}`
     console.error('刷新过程出错:', e)
   }
+
+  return result
 }
 
 function parseCookie (str) {
@@ -114,15 +146,15 @@ function parseCookie (str) {
   return dict
 }
 
-// --- 以下为移植的签名算法与辅助函数 ---
+// --- 签名算法 (使用 node:crypto) ---
 
-// 移植自 lx-music-api-server/modules/plat/tx/sign.py
 function signBody (payload) {
   const PART_1_INDEXES = [23, 14, 6, 36, 16, 40, 7, 19].filter(x => x < 40)
   const PART_2_INDEXES = [16, 1, 32, 12, 19, 27, 8, 5]
   const SCRAMBLE_VALUES = [89, 39, 179, 150, 218, 82, 58, 252, 177, 52, 186, 123, 120, 64, 242, 133, 143, 161, 121, 179]
 
-  const hash = sha1(payload).toUpperCase()
+  // 使用 node:crypto 进行 SHA1 计算，确保准确性
+  const hash = createHash('sha1').update(payload, 'utf8').digest('hex').toUpperCase()
 
   const part1 = PART_1_INDEXES.map(i => hash[i]).join('')
   const part2 = PART_2_INDEXES.map(i => hash[i]).join('')
@@ -134,95 +166,17 @@ function signBody (payload) {
     part3[i] = v ^ hexVal
   }
 
-  // Base64 编码并移除特殊字符
+  // Base64 编码
   let binary = ''
   for (let i = 0; i < part3.length; i++) {
     binary += String.fromCharCode(part3[i])
   }
-  // 兼容 Cloudflare Workers / Browser 环境
   const b64Part = btoa(binary).replace(/[\\/+=]/g, '')
 
   return `zzc${part1}${b64Part}${part2}`.toLowerCase()
 }
 
-// 简单的 SHA1 实现 (避免依赖 crypto 库以适应 Edge 环境)
-function sha1 (str) {
-  const utf8 = unescape(encodeURIComponent(str))
-  const arr = []
-  for (let i = 0; i < utf8.length; i++) arr.push(utf8.charCodeAt(i))
-  
-  // Append padding
-  const len = arr.length * 8
-  arr.push(0x80)
-  while ((arr.length * 8 + 64) % 512 !== 0) arr.push(0)
-  
-  // Append length
-  for (let i = 0; i < 8; i++) {
-    arr.push((len >>> ((7 - i) * 8)) & 0xff)
-  }
-
-  const w = new Array(80)
-  let h0 = 0x67452301
-  let h1 = 0xefcdab89
-  let h2 = 0x98badcfe
-  let h3 = 0x10325476
-  let h4 = 0xc3d2e1f0
-
-  for (let i = 0; i < arr.length; i += 64) {
-    const chunk = arr.slice(i, i + 64)
-    for (let j = 0; j < 16; j++) {
-      w[j] = (chunk[j * 4] << 24) | (chunk[j * 4 + 1] << 16) | (chunk[j * 4 + 2] << 8) | chunk[j * 4 + 3]
-    }
-    for (let j = 16; j < 80; j++) {
-      w[j] = (w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16])
-      w[j] = (w[j] << 1) | (w[j] >>> 31)
-    }
-
-    let a = h0
-    let b = h1
-    let c = h2
-    let d = h3
-    let e = h4
-
-    for (let j = 0; j < 80; j++) {
-      let f, k
-      if (j < 20) {
-        f = (b & c) | (~b & d)
-        k = 0x5a827999
-      } else if (j < 40) {
-        f = b ^ c ^ d
-        k = 0x6ed9eba1
-      } else if (j < 60) {
-        f = (b & c) | (b & d) | (c & d)
-        k = 0x8f1bbcdc
-      } else {
-        f = b ^ c ^ d
-        k = 0xca62c1d6
-      }
-
-      const temp = ((a << 5) | (a >>> 27)) + f + e + k + w[j]
-      e = d
-      d = c
-      c = (b << 30) | (b >>> 2)
-      b = a
-      a = temp | 0
-    }
-
-    h0 = (h0 + a) | 0
-    h1 = (h1 + b) | 0
-    h2 = (h2 + c) | 0
-    h3 = (h3 + d) | 0
-    h4 = (h4 + e) | 0
-  }
-
-  return [h0, h1, h2, h3, h4]
-    .map(x => (x >>> 0).toString(16).padStart(8, '0'))
-    .join('')
-}
-
-// 移植自 lx-music-api-server/modules/plat/tx/utils.py
-function buildComm (uin, token) {
-  // 模拟 QIMEI (随机生成)
+function buildComm (uin, token, qimei16, qimei36) {
   const randomHex = (len) => {
     let res = ''
     const chars = '0123456789abcdef'
@@ -230,13 +184,17 @@ function buildComm (uin, token) {
     return res
   }
 
+  // 优先使用 Cookie 中的 QIMEI，否则随机
+  const QIMEI = qimei16 || randomHex(16)
+  const QIMEI36 = qimei36 || randomHex(36)
+
   const common = {
     v: 14090008,
     ct: 11,
     cv: 14090008,
     chid: '2005000982',
-    QIMEI: randomHex(16), // 模拟 QIMEI16
-    QIMEI36: randomHex(36), // 模拟 QIMEI36
+    QIMEI, 
+    QIMEI36,
     tmeAppID: 'qqmusic',
     format: 'json',
     inCharset: 'utf-8',
