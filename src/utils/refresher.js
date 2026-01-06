@@ -83,7 +83,7 @@ export async function refreshQQCookie (env) {
     })
 
     const data = await response.json()
-    result.data = data
+    // result.data = data // 避免返回敏感数据
 
     // 检查响应
     if (data.req?.code !== 0) {
